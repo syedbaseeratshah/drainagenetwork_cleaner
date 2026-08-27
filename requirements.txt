@@ -1,0 +1,4 @@
+geopandas>=1.0
+shapely>=2.0
+pyogrio>=0.9
+folium>=0.16
