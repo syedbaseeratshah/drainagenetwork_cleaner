@@ -1,5 +1,10 @@
 # drainage_cleaning
 
+Two standalone Python pipelines that scan a SWMM-style drainage network (Conduit +
+Junctions shapefiles) for topology flaws - dangling pipes, duplicate geometry,
+unreferenced junctions, dead ends, redundant loops - color-code them, and produce
+a fully cleaned network with an interactive map.
+
 Two scripts for taking a raw SWMM-style drainage network (a Conduit line
 shapefile + a Junctions point shapefile) and turning it into something that
 doesn't fall over when you try to model it. Built against the Chirag Delhi
