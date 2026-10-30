@@ -32,12 +32,22 @@ priority):
      downstream AND whose destination junctions have matching
      elevations is the same path digitized twice, not a real tributary
      split - the redundant branch is removed.
+  7. Fix invert spikes/pits: a single junction whose invert stands out of
+     the line of its neighbours makes the pipe next to it run uphill. The
+     invert is interpolated between the neighbours (network_repairs.py).
+  8. Raise rims: where a closed pipe is taller than rim minus invert the
+     rim is raised to the pipe crown, or to the ground when --dem is given
+     and the ground is at or above the crown. Rims are never lowered.
+  Steps 7 and 8 are skipped with --no-repairs. Every changed value keeps
+  its original in an *_ORIG column and is listed in a review CSV.
 
 Output (outputs/clean/):
     conduit_final.shp / .qml     - cleaned conduits, colored by XSECTION
     junctions_final.shp / .qml   - cleaned junctions, colored by NODETYPE
     before_after_map.html        - interactive map: raw network in grey,
                                     everything removed highlighted in red
+    invert_fix_review.csv        - every uphill conduit checked in step 7, with the decision
+    rim_raise_review.csv         - every rim changed in step 8
     clean_report.txt             - what was removed/renamed and why
 """
 
@@ -50,20 +60,20 @@ from pathlib import Path
 import geopandas as gpd
 
 import network_checks as checks
+import network_repairs as repairs
 from mapping import build_html_map, write_qml_lines, write_qml_points
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parent.parent
-DEFAULT_CONDUIT = REPO_ROOT / "05_chirag_delhi" / "01_raw_drainage_network" / "shapefiles" / "Conduit.shp"
-DEFAULT_JUNCTIONS = REPO_ROOT / "05_chirag_delhi" / "01_raw_drainage_network" / "shapefiles" / "Junctions.shp"
 DEFAULT_OUTDIR = SCRIPT_DIR.parent / "outputs" / "clean"
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Clean a drainage network: remove dangling/duplicate data, fix dead ends, collapse redundant loops.")
-    parser.add_argument("--conduit", type=Path, default=DEFAULT_CONDUIT, help="Path to the Conduit line shapefile.")
-    parser.add_argument("--junctions", type=Path, default=DEFAULT_JUNCTIONS, help="Path to the Junctions point shapefile.")
+    parser.add_argument("--conduit", type=Path, required=True, help="Path to the Conduit line shapefile.")
+    parser.add_argument("--junctions", type=Path, required=True, help="Path to the Junctions point shapefile.")
     parser.add_argument("--outdir", type=Path, default=DEFAULT_OUTDIR, help="Where to write the cleaned shapefiles, map, and report.")
+    parser.add_argument("--dem", type=Path, default=None, help="Optional DEM raster (same units as the invert levels). Lets step 8 raise rims to the ground.")
+    parser.add_argument("--no-repairs", action="store_true", help="Skip steps 7 and 8 (invert spikes, rims) and only clean the topology.")
     return parser.parse_args()
 
 
@@ -191,7 +201,26 @@ def main() -> None:
     print("Step 6: collapsing redundant loops...")
     conduit, junctions = collapse_redundant_loops(conduit, junctions, log)
 
+    if not args.no_repairs:
+        print("Step 7: fixing invert spikes and pits...")
+        conduit, junctions, inv_review = repairs.fix_invert_spikes(conduit, junctions)
+        n_inv = int(junctions["INV_FIX"].sum())
+        log.append(f"Invert spikes/pits corrected: {n_inv} junction(s); {len(inv_review)} uphill conduit(s) checked, see invert_fix_review.csv")
+
+        print("Step 8: raising rims where a pipe does not fit the node...")
+        junctions, rim_review = repairs.raise_rims(conduit, junctions, dem_path=args.dem)
+        log.append(
+            f"Rims raised: {len(rim_review)} junction(s) "
+            f"(to pipe crown {int(junctions['RIM_CROWN'].sum())}"
+            + (f", to ground {int(junctions['RIM_FIX'].sum())}, unflagged to ground {int(junctions['RIM_UP_DEM'].sum())}, "
+               f"level conflicts kept {int(junctions['RIM_CONFL'].sum())}" if args.dem else ", no DEM given")
+            + "), see rim_raise_review.csv"
+        )
+
     args.outdir.mkdir(parents=True, exist_ok=True)
+    if not args.no_repairs:
+        inv_review.to_csv(args.outdir / "invert_fix_review.csv", index=False)
+        rim_review.to_csv(args.outdir / "rim_raise_review.csv", index=False)
     conduit_out = args.outdir / "conduit_final.shp"
     junctions_out = args.outdir / "junctions_final.shp"
     conduit.to_file(conduit_out)

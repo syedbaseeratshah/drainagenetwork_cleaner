@@ -47,7 +47,7 @@ def build_html_map(
     else:
         center = [28.6, 77.2]  # Delhi, fallback only
 
-    fmap = folium.Map(location=center, zoom_start=14, tiles="CartoDB positron")
+    fmap = folium.Map(location=center, zoom_start=14, tiles="OpenStreetMap")
 
     for _, row in conduit_wgs84.iterrows():
         category = row[conduit_color_field]

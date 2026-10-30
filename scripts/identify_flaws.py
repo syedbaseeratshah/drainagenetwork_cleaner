@@ -54,9 +54,6 @@ import network_checks as checks
 from mapping import build_html_map, write_qml_lines, write_qml_points
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parent.parent  # .../DELHI_CLEAN
-DEFAULT_CONDUIT = REPO_ROOT / "05_chirag_delhi" / "01_raw_drainage_network" / "shapefiles" / "Conduit.shp"
-DEFAULT_JUNCTIONS = REPO_ROOT / "05_chirag_delhi" / "01_raw_drainage_network" / "shapefiles" / "Junctions.shp"
 DEFAULT_OUTDIR = SCRIPT_DIR.parent / "outputs" / "identify"
 
 CONDUIT_PRIORITY = ["ISLAND", "ORPHANEND", "DUPNAME", "DUPGEOM", "SELFLOOP", "BADGEOM", "NODIM", "SLOPE999", "NEGSLOPE"]
@@ -74,8 +71,8 @@ JUNCTION_COLORS = {
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Detect and color-code every flaw in a drainage network.")
-    parser.add_argument("--conduit", type=Path, default=DEFAULT_CONDUIT, help="Path to the Conduit line shapefile.")
-    parser.add_argument("--junctions", type=Path, default=DEFAULT_JUNCTIONS, help="Path to the Junctions point shapefile.")
+    parser.add_argument("--conduit", type=Path, required=True, help="Path to the Conduit line shapefile.")
+    parser.add_argument("--junctions", type=Path, required=True, help="Path to the Junctions point shapefile.")
     parser.add_argument("--outdir", type=Path, default=DEFAULT_OUTDIR, help="Where to write flagged shapefiles, map, and report.")
     return parser.parse_args()
 
